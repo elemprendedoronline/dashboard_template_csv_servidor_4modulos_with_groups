@@ -644,102 +644,136 @@ async function fetchCSVFromGitHub() {
     }
 }
 
-        function processUploadedData(data, cutoffDateValue) {
-            window.rawDataset = data;
-            
-            // Filtrar filas completamente vacías o sin identificador/nombre mínimo utilizando el Loose Key Matcher
-            const validRows = window.rawDataset.filter(item => {
-                if (!item || typeof item !== 'object') return false;
-                const hasId = getRowValueByLooseKey(item, 'id') || getRowValueByLooseKey(item, 'numero de id');
-                const hasName = getRowValueByLooseKey(item, 'nombre');
-                const hasEmail = getRowValueByLooseKey(item, 'direccion de correo') || getRowValueByLooseKey(item, 'correo') || getRowValueByLooseKey(item, 'email');
-                return !!(hasId || hasName || hasEmail);
-            });
+    function processUploadedData(data, cutoffDateValue) {
+    // Guardar dataset crudo
+    window.rawDataset = data;
 
-            window.cleanDataset = validRows.map(item => {
-                let completedCount = 0;
-                
-                // Mapear los valores de los módulos de manera tolerante a espaciados y BOMs
-                const m1_val = getRowValueByLooseKey(item, MODULE_NAMES[0]);
-                const m2_val = getRowValueByLooseKey(item, MODULE_NAMES[1]);
-                const m3_val = getRowValueByLooseKey(item, MODULE_NAMES[2]);
-                const m4_val = getRowValueByLooseKey(item, MODULE_NAMES[3]);
-                const m5_val = getRowValueByLooseKey(item, MODULE_NAMES[4]);
+    // Filtrar filas válidas usando Loose Key Matcher
+    const validRows = window.rawDataset.filter(item => {
+        if (!item || typeof item !== 'object') return false;
+        const hasId =
+            getRowValueByLooseKey(item, 'id') ||
+            getRowValueByLooseKey(item, 'numero de id');
+        const hasName = getRowValueByLooseKey(item, 'nombre');
+        const hasEmail =
+            getRowValueByLooseKey(item, 'direccion de correo') ||
+            getRowValueByLooseKey(item, 'correo') ||
+            getRowValueByLooseKey(item, 'email');
+        return !!(hasId || hasName || hasEmail);
+    });
 
-                const m1_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[0]);
-                const m2_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[1]);
-                const m3_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[2]);
-                const m4_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[3]);
-                const m5_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[4]);
+    // Mapear al formato estándar del dashboard
+    window.cleanDataset = validRows.map(item => {
+        let completedCount = 0;
 
-                const mValues = [m1_val, m2_val, m3_val, m4_val];
-                mValues.forEach(val => {
-                    if (String(val).trim().toLowerCase() === 'finalizado') {
-                        completedCount++;
-                    }
-                });
+        // Valores de módulos (tolerantes a BOMs/espacios)
+        const m1_val = getRowValueByLooseKey(item, MODULE_NAMES[0]);
+        const m2_val = getRowValueByLooseKey(item, MODULE_NAMES[1]);
+        const m3_val = getRowValueByLooseKey(item, MODULE_NAMES[2]);
+        const m4_val = getRowValueByLooseKey(item, MODULE_NAMES[3]);
+        const m5_val = getRowValueByLooseKey(item, MODULE_NAMES[4]); // si no existe en tu CSV, quedará undefined
 
-                // Curso finalizado
-                const cursoFinVal = getRowValueByLooseKey(item, "Curso finalizado");
-                const isCourseDone = (completedCount === 4 || cursoFinVal.toLowerCase() === 'finalizado' || !!cursoFinVal.match(/\d+/));
-                
-                let globalCompletionDate = "";
-                if (isCourseDone) {
-                    if (cursoFinVal && cursoFinVal.match(/\d+/)) {
-                        globalCompletionDate = cursoFinVal;
-                    } else {
-                        const dates = [m1_date, m2_date, m3_date, m4_date, m5_date].filter(d => d);
-                        if (dates.length > 0) {
-                            globalCompletionDate = dates[dates.length - 1];
-                        } else {
-                            globalCompletionDate = "10/06/2026 12:28";
-                        }
-                    }
+        const m1_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[0]);
+        const m2_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[1]);
+        const m3_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[2]);
+        const m4_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[3]);
+        const m5_date = getRowDateValueByLooseKey(item, MODULE_DATE_KEYS[4]);
+
+        const mValues = [m1_val, m2_val, m3_val, m4_val];
+        mValues.forEach(val => {
+            if (String(val || '').trim().toLowerCase() === 'finalizado') {
+                completedCount++;
+            }
+        });
+
+        // Curso finalizado (protegido contra null/undefined)
+        const cursoFinValRaw = getRowValueByLooseKey(item, "Curso finalizado") || "";
+        const cursoFinVal = String(cursoFinValRaw);
+
+        const isCourseDone =
+            completedCount === 4 ||
+            cursoFinVal.toLowerCase() === 'finalizado' ||
+            (cursoFinVal && cursoFinVal.match(/\d+/));
+
+        let globalCompletionDate = "";
+        if (isCourseDone) {
+            if (cursoFinVal && cursoFinVal.match(/\d+/)) {
+                globalCompletionDate = cursoFinVal;
+            } else {
+                const dates = [m1_date, m2_date, m3_date, m4_date, m5_date].filter(d => d);
+                if (dates.length > 0) {
+                    globalCompletionDate = dates[dates.length - 1];
+                } else {
+                    // Fecha por defecto si no hay ninguna fecha en los módulos
+                    globalCompletionDate = "10/06/2026 12:28";
                 }
+            }
+        }
 
-                const grupoVal =
-    getRowValueByLooseKey(item, 'nombre de grupo') ||
-    getRowValueByLooseKey(item, 'grupo') ||
-    getRowValueByLooseKey(item, 'group name') ||
-    getRowValueByLooseKey(item, 'grupo_nombre') ||
-    'Sin grupo';
+        // Grupo
+        const grupoVal =
+            getRowValueByLooseKey(item, 'nombre de grupo') ||
+            getRowValueByLooseKey(item, 'grupo') ||
+            getRowValueByLooseKey(item, 'group name') ||
+            getRowValueByLooseKey(item, 'grupo_nombre') ||
+            'Sin grupo';
 
-                const idVal = getRowValueByLooseKey(item, 'id') || getRowValueByLooseKey(item, 'numero de id') || Math.random().toString(36).substr(2, 9);
-                const nombreVal = getRowValueByLooseKey(item, 'nombre') || 'Colaborador Sin Nombre';
-                const emailVal = getRowValueByLooseKey(item, 'direccion de correo') || getRowValueByLooseKey(item, 'correo') || getRowValueByLooseKey(item, 'email') || 'sin-correo@ilsa.la';
+        // Campos básicos
+        const idVal =
+            getRowValueByLooseKey(item, 'id') ||
+            getRowValueByLooseKey(item, 'numero de id') ||
+            Math.random().toString(36).substr(2, 9);
+        const nombreVal = getRowValueByLooseKey(item, 'nombre') || 'Colaborador Sin Nombre';
+        const emailVal =
+            getRowValueByLooseKey(item, 'direccion de correo') ||
+            getRowValueByLooseKey(item, 'correo') ||
+            getRowValueByLooseKey(item, 'email') ||
+            'sin-correo@ilsa.la';
 
-                return {
-                    id: idVal,
-                    nombre: nombreVal,
-                    grupo: grupoVal,
-                    email: emailVal,
-                    m1: m1_val || 'No finalizado',
-                    m1_date: m1_date || '',
-                    m2: m2_val || 'No finalizado',
-                    m2_date: m2_date || '',
-                    m3: m3_val || 'No finalizado',
-                    m3_date: m3_date || '',
-                    m4: m4_val || 'No finalizado',
-                    m4_date: m4_date || '',
-                    completado: isCourseDone,
-                    modulos_completados: completedCount,
-                    fecha_fin: globalCompletionDate
-                };
-            });
+        // Objeto final que usa todo el dashboard
+        return {
+            id: String(idVal || '').trim(),
+            nombre: String(nombreVal || '').trim(),
+            grupo: String(grupoVal || '').trim(),
+            email: String(emailVal || '').trim(),
 
-            window.cleanDataset.sort((a, b) => a.nombre.localeCompare(b.nombre));
-            window.filteredDataset = [...window.cleanDataset];
-            currentPage = 1;
+            m1: m1_val || 'No finalizado',
+            m1_date: m1_date || '',
+            m2: m2_val || 'No finalizado',
+            m2_date: m2_date || '',
+            m3: m3_val || 'No finalizado',
+            m3_date: m3_date || '',
+            m4: m4_val || 'No finalizado',
+            m4_date: m4_date || '',
+            m5: m5_val || 'No finalizado',
+            m5_date: m5_date || '',
 
-            document.getElementById('cutoff-date-badge').innerText = cutoffDateValue;
-            document.getElementById('dashboard-content').classList.remove('hidden');
+            modulos_completados: completedCount,
+            completado: !!isCourseDone,
+            fecha_fin: globalCompletionDate
+        };
+    });
 
-            // Poblar el filtro de grupo con los datos ya cargados
-populateGroupFilter();
+    // Ordenar y preparar estado base
+    window.cleanDataset.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    window.filteredDataset = [...window.cleanDataset];
+    window.tableStatusFilteredDataset = null;
+    currentPage = 1;
 
-// Aplicar filtros globales (búsqueda + grupo) y desde ahí recalcular KPIs, gráficos y tabla
-applyGlobalFilters();
-}  // cierra processUploadedData
+    // Actualizar UI de corte y mostrar dashboard
+    const cutoffBadge = document.getElementById('cutoff-date-badge');
+    if (cutoffBadge && cutoffDateValue) {
+        cutoffBadge.innerText = cutoffDateValue;
+    }
+    const dashboardContent = document.getElementById('dashboard-content');
+    if (dashboardContent) {
+        dashboardContent.classList.remove('hidden');
+    }
+
+    // Poblar filtro de grupo y aplicar filtros globales
+    populateGroupFilter();
+    applyGlobalFilters(); // esto recalcula KPIs, gráficos y tabla
+}    
         
 
         // Renderizadores de Datos
@@ -1041,67 +1075,86 @@ function renderTable() {
         return;
     }
 
-            pageData.forEach(item => {
-                const totalMod = item.modulos_completados;
-                const pct = Math.round((totalMod / 4) * 100);
+          pageData.forEach(item => {
+        const totalMod = item.modulos_completados;
+        const pct = Math.round((totalMod / 4) * 100);
 
-                const getModBadge = (status) => {
-                    if (String(status).trim().toLowerCase() === 'finalizado') {
-                        return `<span class="inline-flex h-5 w-5 rounded-full bg-emerald-100 text-emerald-800 items-center justify-center font-bold text-[10px]" title="Completado">✓</span>`;
-                    }
-                    return `<span class="inline-flex h-5 w-5 rounded-full bg-slate-100 text-slate-400 items-center justify-center font-bold text-[10px]" title="Pendiente">-</span>`;
-                };
+        const getModBadge = (status) => {
+            if (String(status).trim().toLowerCase() === 'finalizado') {
+                return `<span class="inline-flex h-5 w-5 rounded-full bg-emerald-100 text-emerald-800 items-center justify-center font-bold text-[10px]" title="Completado">✓</span>`;
+            }
+            return `<span class="inline-flex h-5 w-5 rounded-full bg-slate-100 text-slate-400 items-center justify-center font-bold text-[10px]" title="Pendiente">-</span>`;
+        };
 
-                const safeId = escapeHtml(item.id);
-                const safeNombre = escapeHtml(item.nombre);
-                const safeEmail = escapeHtml(item.email);
-                const safeFechaFin = escapeHtml(item.fecha_fin);
+        const safeId = escapeHtml(item.id);
+        const safeNombre = escapeHtml(item.nombre);
+        const safeEmail = escapeHtml(item.email);
+        const safeFechaFin = escapeHtml(item.fecha_fin);
 
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition border-b border-slate-100/50";
-                tr.innerHTML = `
-                    <td class="py-3 px-5 font-mono text-slate-500 font-bold">${safeId}</td>
-                    <td class="py-3 px-5 font-bold text-slate-900">${safeNombre}</td>
-                    <td class="py-3 px-5 text-slate-500 truncate max-w-xs">${safeEmail}</td>
-                    <td class="py-3 px-5 text-center">
-                        <div class="flex items-center justify-center gap-2">
-                            <div class="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                <div class="h-1.5 rounded-full ${item.completado ? 'bg-emerald-500' : 'bg-brand-500'}" style="width: ${pct}%"></div>
-                            </div>
-                            <span class="font-bold text-slate-600">${pct}%</span>
-                        </div>
-                    </td>
-                    <td class="py-3 px-5 text-center">${getModBadge(item.m1)}</td>
-                    <td class="py-3 px-5 text-center">${getModBadge(item.m2)}</td>
-                    <td class="py-3 px-5 text-center">${getModBadge(item.m3)}</td>
-                    <td class="py-3 px-5 text-center">${getModBadge(item.m4)}</td>
-                    <td class="py-3 px-5 text-center">
-                        ${item.completado 
-                            ? `<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px]" title="${safeFechaFin}">Completado</span>`
-                            : `<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px]">En Curso</span>`
-                        }
-                    </td>
-                    <td class="py-3 px-5 text-right">
-                        <button onclick="openParticipantModal('${safeId}')" class="px-2.5 py-1.5 text-[11px] font-bold bg-slate-100 hover:bg-brand-50 hover:text-brand-700 text-slate-600 rounded transition cursor-pointer font-medium">
-                            Ver Ficha
-                        </button>
-                    </td>
-                `;
-                tableBody.appendChild(tr);
-            });
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100/50";
+        tr.innerHTML = `
+            <td class="py-3 px-5 font-mono text-slate-500 font-bold">${safeId}</td>
+            <td class="py-3 px-5 font-bold text-slate-900">${safeNombre}</td>
+            <td class="py-3 px-5 text-slate-500 truncate max-w-xs">${safeEmail}</td>
+            <td class="py-3 px-5 text-center">
+                <div class="flex items-center justify-center gap-2">
+                    <div class="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div class="h-1.5 rounded-full ${item.completado ? 'bg-emerald-500' : 'bg-brand-500'}" style="width: ${pct}%"></div>
+                    </div>
+                    <span class="font-bold text-slate-600">${pct}%</span>
+                </div>
+            </td>
+            <td class="py-3 px-5 text-center">${getModBadge(item.m1)}</td>
+            <td class="py-3 px-5 text-center">${getModBadge(item.m2)}</td>
+            <td class="py-3 px-5 text-center">${getModBadge(item.m3)}</td>
+            <td class="py-3 px-5 text-center">${getModBadge(item.m4)}</td>
+            <td class="py-3 px-5 text-center">
+                ${item.completado 
+                    ? `<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px]" title="${safeFechaFin}">Completado</span>`
+                    : `<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px]">En Curso</span>`
+                }
+            </td>
+            <td class="py-3 px-5 text-right">
+                <button onclick="openParticipantModal('${safeId}')" class="px-2.5 py-1.5 text-[11px] font-bold bg-slate-100 hover:bg-brand-50 hover:text-brand-700 text-slate-600 rounded transition cursor-pointer font-medium">
+                    Ver Ficha
+                </button>
+            </td>
+        `;
+        tableBody.appendChild(tr);
+    });
 
-            updatePaginationControls(window.filteredDataset.length);
-        }
+    // Usar la cantidad real de filas que se muestran (baseData) para la paginación
+    updatePaginationControls(baseData.length);
+}      
 
-        function updatePaginationControls(totalRows) {
-            const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
-            
-            document.getElementById('table-row-count').innerText = `Mostrando ${Math.min(window.filteredDataset.length, (currentPage - 1) * rowsPerPage + 1)}-${Math.min(window.filteredDataset.length, currentPage * rowsPerPage)} de ${window.filteredDataset.length} registros`;
-            document.getElementById('table-page-indicator').innerText = `Página ${currentPage} de ${totalPages}`;
-            
-            document.getElementById('btn-prev-page').disabled = (currentPage === 1);
-            document.getElementById('btn-next-page').disabled = (currentPage === totalPages);
-        }
+function updatePaginationControls(totalRows) {
+    const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+
+    const start = totalRows === 0
+        ? 0
+        : (currentPage - 1) * rowsPerPage + 1;
+    const end = totalRows === 0
+        ? 0
+        : Math.min(currentPage * rowsPerPage, totalRows);
+
+    const rowCountEl = document.getElementById('table-row-count');
+    const pageIndicatorEl = document.getElementById('table-page-indicator');
+
+    if (rowCountEl) {
+        rowCountEl.innerText = `Mostrando ${start}-${end} de ${totalRows} registros`;
+    }
+
+    if (pageIndicatorEl) {
+        pageIndicatorEl.innerText = `Página ${currentPage} de ${totalPages}`;
+    }
+
+    const prevBtn = document.getElementById('btn-prev-page');
+    const nextBtn = document.getElementById('btn-next-page');
+
+    if (prevBtn) prevBtn.disabled = (currentPage === 1);
+    if (nextBtn) nextBtn.disabled = (currentPage === totalPages);
+}        
 
         function prevPage() {
             if (currentPage > 1) {
