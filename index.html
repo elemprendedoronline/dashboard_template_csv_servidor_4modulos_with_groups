@@ -788,248 +788,263 @@ async function fetchCSVFromGitHub() {
 }    
         
 
-        // Renderizadores de Datos
-        function renderKPIs() {
-            const total = window.cleanDataset.length;
-            const completed = window.cleanDataset.filter(item => item.completado).length;
-            const pending = total - completed;
-            const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+ function renderKPIs() {
+    // Usar dataset filtrado si existe; si no, el completo
+    const baseData = (window.filteredDataset && window.filteredDataset.length > 0)
+        ? window.filteredDataset
+        : window.cleanDataset;
 
-            document.getElementById('kpi-total-enrolled').innerText = total;
-            document.getElementById('kpi-completion-rate').innerText = rate + "%";
-            document.getElementById('kpi-progress-bar').style.width = rate + "%";
-            document.getElementById('kpi-total-completed').innerText = completed;
-            document.getElementById('kpi-total-pending').innerText = pending;
-        }
+    const total = baseData.length;
+    const completed = baseData.filter(item => item.completado).length;
+    const pending = total - completed;
+    const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    const elTotal = document.getElementById('kpi-total-enrolled');
+    const elRate = document.getElementById('kpi-completion-rate');
+    const elBar = document.getElementById('kpi-progress-bar');
+    const elCompleted = document.getElementById('kpi-total-completed');
+    const elPending = document.getElementById('kpi-total-pending');
+
+    if (elTotal) elTotal.innerText = total;
+    if (elRate) elRate.innerText = rate + "%";
+    if (elBar) elBar.style.width = rate + "%";
+    if (elCompleted) elCompleted.innerText = completed;
+    if (elPending) elPending.innerText = pending;
+}
 
         function renderModuleBreakdown() {
-            const container = document.getElementById('module-progress-bars');
-            container.innerHTML = '';
-            const totalParticipants = window.cleanDataset.length;
+    const container = document.getElementById('module-progress-bars');
+    if (!container) return;
+    container.innerHTML = '';
 
-            MODULE_NAMES.forEach((modName, idx) => {
-                const cleanKey = `m${idx + 1}`;
-                const completedCount = window.cleanDataset.filter(item => String(item[cleanKey]).toLowerCase() === 'finalizado').length;
-                const percentage = totalParticipants > 0 ? Math.round((completedCount / totalParticipants) * 100) : 0;
+    const baseData = (window.filteredDataset && window.filteredDataset.length > 0)
+        ? window.filteredDataset
+        : window.cleanDataset;
 
-                const colors = ['from-purple-500 to-indigo-500', 'from-blue-500 to-cyan-500', 'from-emerald-500 to-teal-500', 'from-amber-500 to-orange-500', 'from-rose-500 to-pink-500'];
-                const selectedGradient = colors[idx % colors.length];
+    const totalParticipants = baseData.length;
 
-                const cardHtml = `
-                    <div class="space-y-1">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-bold text-slate-700 max-w-xs sm:max-w-md truncate">${escapeHtml(modName)}</span>
-                            <span class="font-bold text-slate-900">${completedCount} <span class="text-slate-400 font-medium">(${percentage}%)</span></span>
-                        </div>
-                        <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex shadow-inner">
-                            <div class="bg-gradient-to-r ${selectedGradient} h-2.5 rounded-full transition-all duration-1000" style="width: ${percentage}%"></div>
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += cardHtml;
-            });
-        }
+    MODULE_NAMES.forEach((modName, idx) => {
+        const cleanKey = `m${idx + 1}`;
+        const completedCount = baseData.filter(
+            item => String(item[cleanKey] || '').toLowerCase() === 'finalizado'
+        ).length;
+        const percentage = totalParticipants > 0 ? Math.round((completedCount / totalParticipants) * 100) : 0;
+
+        const colors = ['from-purple-500 to-indigo-500', 'from-blue-500 to-cyan-500', 'from-emerald-500 to-teal-500', 'from-amber-500 to-orange-500', 'from-rose-500 to-pink-500'];
+        const selectedGradient = colors[idx % colors.length];
+
+        const cardHtml = `
+            <div class="space-y-1">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-700 max-w-xs sm:max-w-md truncate">${escapeHtml(modName)}</span>
+                    <span class="font-bold text-slate-900">${completedCount} <span class="text-slate-400 font-medium">(${percentage}%)</span></span>
+                </div>
+                <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex shadow-inner">
+                    <div class="bg-gradient-to-r ${selectedGradient} h-2.5 rounded-full transition-all duration-1000" style="width: ${percentage}%"></div>
+                </div>
+            </div>
+        `;
+        container.innerHTML += cardHtml;
+    });
+}
 
         function renderDomainBreakdown() {
-            const domainList = document.getElementById('domain-list');
-            domainList.innerHTML = '';
+    const domainList = document.getElementById('domain-list');
+    if (!domainList) return;
+    domainList.innerHTML = '';
 
-            const domains = {};
-            window.cleanDataset.forEach(item => {
-                const parts = item.email.split('@');
-                const domain = parts.length > 1 ? parts[1].toLowerCase() : 'otros';
-                if (!domains[domain]) {
-                    domains[domain] = { total: 0, completed: 0 };
-                }
-                domains[domain].total++;
-                if (item.completado) {
-                    domains[domain].completed++;
-                }
-            });
+    const baseData = (window.filteredDataset && window.filteredDataset.length > 0)
+        ? window.filteredDataset
+        : window.cleanDataset;
 
-            const sortedDomains = Object.keys(domains).sort((a, b) => domains[b].total - domains[a].total);
-
-            sortedDomains.forEach(dom => {
-                const stats = domains[dom];
-                const rate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-
-                const domHtml = `
-                    <div class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition border border-slate-100">
-                        <div class="min-w-0 flex-1 pr-2">
-                            <div class="flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-brand-500"></span>
-                                <span class="text-xs font-bold text-slate-800 truncate select-all font-mono">@${escapeHtml(dom)}</span>
-                            </div>
-                            <span class="text-[10px] text-slate-400 font-medium">${stats.total} colaboradores • ${stats.completed} graduados</span>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-xs font-bold ${rate === 100 ? 'text-emerald-600' : 'text-slate-700'}">${rate}%</span>
-                            <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Avance</p>
-                        </div>
-                    </div>
-                `;
-                domainList.innerHTML += domHtml;
-            });
+    const domains = {};
+    baseData.forEach(item => {
+        const parts = String(item.email || '').split('@');
+        const domain = parts.length > 1 ? parts[1].toLowerCase() : 'otros';
+        if (!domains[domain]) {
+            domains[domain] = { total: 0, completed: 0 };
         }
+        domains[domain].total++;
+        if (item.completado) {
+            domains[domain].completed++;
+        }
+    });
+
+    const sortedDomains = Object.keys(domains).sort((a, b) => domains[b].total - domains[a].total);
+
+    sortedDomains.forEach(dom => {
+        const stats = domains[dom];
+        const rate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+
+        const domHtml = `
+            <div class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition border border-slate-100">
+                <div class="min-w-0 flex-1 pr-2">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-brand-500"></span>
+                        <span class="text-xs font-bold text-slate-800 truncate select-all font-mono">@${escapeHtml(dom)}</span>
+                    </div>
+                    <span class="text-[10px] text-slate-400 font-medium">${stats.total} colaboradores • ${stats.completed} graduados</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs font-bold ${rate === 100 ? 'text-emerald-600' : 'text-slate-700'}">${rate}%</span>
+                    <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Avance</p>
+                </div>
+            </div>
+        `;
+        domainList.innerHTML += domHtml;
+    });
+}
 
         function renderCharts() {
-            const total = window.cleanDataset.length;
-            const completed = window.cleanDataset.filter(item => item.completado).length;
-            const pending = total - completed;
+    const baseData = (window.filteredDataset && window.filteredDataset.length > 0)
+        ? window.filteredDataset
+        : window.cleanDataset;
 
-            const chartLoader = window.Chart;
-            if (!chartLoader) return;
+    const total = baseData.length;
+    const completed = baseData.filter(item => item.completado).length;
+    const pending = total - completed;
 
-            // Chart 1: Dona de distribución
-            const ctxDonutEl = document.getElementById('completion-donut-chart');
-            if (ctxDonutEl) {
-                if (completionChartInstance) {
-                    completionChartInstance.destroy();
-                }
-                const ctxDonut = ctxDonutEl.getContext('2d');
-                completionChartInstance = new chartLoader(ctxDonut, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Completado', 'Pendiente / En Progreso'],
-                        datasets: [{
-                            data: [completed, pending],
-                            backgroundColor: ['#10b981', '#fbbf24'],
-                            borderWidth: 2,
-                            borderColor: '#ffffff',
-                            hoverOffset: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        cutout: '72%'
-                    }
-                });
-            }
+    const chartLoader = window.Chart;
+    if (!chartLoader) return;
 
-            const completedDates = window.cleanDataset
-                .filter(item => item.completado && item.fecha_fin)
-                .map(item => {
-                    const cleanDateStr = String(item.fecha_fin).trim();
-                    const parts = cleanDateStr.split(' ');
-                    return parts[0];
-                });
-
-            const dateCounts = {};
-            completedDates.forEach(d => {
-                dateCounts[d] = (dateCounts[d] || 0) + 1;
-            });
-
-            // Parser de fecha seguro frente a excepciones e inconsistencias del Excel
-            const parseDate = (dStr) => {
-                try {
-                    if (!dStr || typeof dStr !== 'string') return new Date(0);
-                    const datePartOnly = dStr.split(' ')[0].trim();
-                    const separator = datePartOnly.includes('/') ? '/' : '-';
-                    const p = datePartOnly.split(separator);
-                    if (p.length < 3) return new Date(0);
-                    
-                    if (p[0].length === 4) { // YYYY-MM-DD
-                        const year = parseInt(p[0], 10) || 2026;
-                        const month = (parseInt(p[1], 10) - 1) || 0;
-                        const day = parseInt(p[2], 10) || 1;
-                        return new Date(year, month, day);
-                    } else { // DD/MM/YYYY
-                        const day = parseInt(p[0], 10) || 1;
-                        const month = (parseInt(p[1], 10) - 1) || 0;
-                        const year = parseInt(p[2], 10) || 2026;
-                        return new Date(year, month, day);
-                    }
-                } catch (err) {
-                    console.error("Error parseando fecha:", dStr, err);
-                    return new Date(0);
-                }
-            };
-
-            // Ordenamiento cronológico de las fechas con parser seguro y comparación robusta de milisegundos (.getTime())
-            const sortedDates = Object.keys(dateCounts)
-                .filter(d => d && (d.includes('/') || d.includes('-')))
-                .sort((a, b) => parseDate(a).getTime() - parseDate(b).getTime());
-
-            const cumulativeData = [];
-            let runningTotal = 0;
-            sortedDates.forEach(date => {
-                runningTotal += dateCounts[date];
-                cumulativeData.push(runningTotal);
-            });
-
-            // Salvaguarda si no hay datos de egresados aún
-            if (sortedDates.length === 0) {
-                sortedDates.push('10/06/2026');
-                cumulativeData.push(completed);
-            }
-
-            // Chart 2: Línea acumulativa temporal
-            const ctxLineEl = document.getElementById('timeline-line-chart');
-            if (ctxLineEl) {
-                if (timelineChartInstance) {
-                    timelineChartInstance.destroy();
-                }
-                const ctxLine = ctxLineEl.getContext('2d');
-                timelineChartInstance = new chartLoader(ctxLine, {
-                    type: 'line',
-                    data: {
-                        labels: sortedDates,
-                        datasets: [{
-                            label: 'Colaboradores Certificados (Acumulado)',
-                            data: cumulativeData,
-                            fill: true,
-                            backgroundColor: 'rgba(124, 58, 237, 0.08)',
-                            borderColor: '#7c3aed',
-                            borderWidth: 3,
-                            pointBackgroundColor: '#7c3aed',
-                            pointHoverRadius: 6,
-                            tension: 0.35
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    precision: 0,
-                                    font: {
-                                        family: 'Plus Jakarta Sans',
-                                        size: 10
-                                    }
-                                },
-                                grid: {
-                                    color: '#f1f5f9'
-                                }
-                            },
-                            x: {
-                                ticks: {
-                                    font: {
-                                        family: 'Plus Jakarta Sans',
-                                        size: 10
-                                    }
-                                },
-                                grid: {
-                                    display: false
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+    // Chart 1: Dona de distribución
+    const ctxDonutEl = document.getElementById('completion-donut-chart');
+    if (ctxDonutEl) {
+        if (completionChartInstance) {
+            completionChartInstance.destroy();
         }
+        const ctxDonut = ctxDonutEl.getContext('2d');
+        completionChartInstance = new chartLoader(ctxDonut, {
+            type: 'doughnut',
+            data: {
+                labels: ['Completado', 'Pendiente / En Progreso'],
+                datasets: [{
+                    data: [completed, pending],
+                    backgroundColor: ['#10b981', '#fbbf24'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                cutout: '72%'
+            }
+        });
+    }
+
+    const completedDates = baseData
+        .filter(item => item.completado && item.fecha_fin)
+        .map(item => {
+            const cleanDateStr = String(item.fecha_fin).trim();
+            const parts = cleanDateStr.split(' ');
+            return parts[0];
+        });
+
+    const dateCounts = {};
+    completedDates.forEach(d => {
+        dateCounts[d] = (dateCounts[d] || 0) + 1;
+    });
+
+    const parseDate = (dStr) => {
+        try {
+            if (!dStr || typeof dStr !== 'string') return new Date(0);
+            const datePartOnly = dStr.split(' ')[0].trim();
+            const separator = datePartOnly.includes('/') ? '/' : '-';
+            const p = datePartOnly.split(separator);
+            if (p.length < 3) return new Date(0);
+
+            if (p[0].length === 4) { // YYYY-MM-DD
+                const year = parseInt(p[0], 10) || 2026;
+                const month = (parseInt(p[1], 10) - 1) || 0;
+                const day = parseInt(p[2], 10) || 1;
+                return new Date(year, month, day);
+            } else { // DD/MM/YYYY
+                const day = parseInt(p[0], 10) || 1;
+                const month = (parseInt(p[1], 10) - 1) || 0;
+                const year = parseInt(p[2], 10) || 2026;
+                return new Date(year, month, day);
+            }
+        } catch (err) {
+            console.error("Error parseando fecha:", dStr, err);
+            return new Date(0);
+        }
+    };
+
+    const sortedDates = Object.keys(dateCounts)
+        .filter(d => d && (d.includes('/') || d.includes('-')))
+        .sort((a, b) => parseDate(a).getTime() - parseDate(b).getTime());
+
+    const cumulativeData = [];
+    let runningTotal = 0;
+    sortedDates.forEach(date => {
+        runningTotal += dateCounts[date];
+        cumulativeData.push(runningTotal);
+    });
+
+    if (sortedDates.length === 0) {
+        sortedDates.push('10/06/2026');
+        cumulativeData.push(completed);
+    }
+
+    const ctxLineEl = document.getElementById('timeline-line-chart');
+    if (ctxLineEl) {
+        if (timelineChartInstance) {
+            timelineChartInstance.destroy();
+        }
+        const ctxLine = ctxLineEl.getContext('2d');
+        timelineChartInstance = new chartLoader(ctxLine, {
+            type: 'line',
+            data: {
+                labels: sortedDates,
+                datasets: [{
+                    label: 'Colaboradores Certificados (Acumulado)',
+                    data: cumulativeData,
+                    fill: true,
+                    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+                    borderColor: '#7c3aed',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#7c3aed',
+                    pointHoverRadius: 6,
+                    tension: 0.35
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0,
+                            font: {
+                                family: 'Plus Jakarta Sans',
+                                size: 10
+                            }
+                        },
+                        grid: { color: '#f1f5f9' }
+                    },
+                    x: {
+                        ticks: {
+                            font: {
+                                family: 'Plus Jakarta Sans',
+                                size: 10
+                            }
+                        },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+}
 
 function populateGroupFilter() {
     const select = document.getElementById('table-filter-group');
