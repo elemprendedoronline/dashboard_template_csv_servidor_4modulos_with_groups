@@ -497,30 +497,42 @@
     return '';
 }
 
-        // Función de utilidad flexible para coincidencia de fechas de módulos
+         // Función de utilidad flexible para coincidencia de fechas de módulos (versión protegida)
         function getRowDateValueByLooseKey(row, searchKey) {
             if (!row) return '';
-            const normalizedSearch = normalizeKeyString(searchKey);
-            
+
+            // Normalizar siempre a string para evitar errores con undefined/null
+            const searchKeyStr = String(searchKey || '').trim();
+            if (!searchKeyStr) return '';
+
+            const normalizedSearch = normalizeKeyString(searchKeyStr);
+
+            // 1. Búsqueda directa por clave normalizada
             for (let key in row) {
-                if (row.hasOwnProperty(key)) {
-                    if (normalizeKeyString(key) === normalizedSearch) {
-                        return row[key] !== undefined && row[key] !== null ? String(row[key]).trim() : '';
-                    }
+                if (!row.hasOwnProperty(key)) continue;
+
+                if (normalizeKeyString(key) === normalizedSearch) {
+                    const value = row[key];
+                    return value !== undefined && value !== null ? String(value).trim() : '';
                 }
             }
-            const moduleMatch = searchKey.match(/Módulo \d/i);
+
+            // 2. Búsqueda por "Módulo X" + "fecha" en la clave
+            const moduleMatch = searchKeyStr.match(/Módulo \d/i);
             if (moduleMatch) {
                 const normalizedModuleNum = normalizeKeyString(moduleMatch[0]);
                 for (let key in row) {
-                    if (row.hasOwnProperty(key)) {
-                        const normalizedKey = normalizeKeyString(key);
-                        if (normalizedKey.includes(normalizedModuleNum) && normalizedKey.includes("fecha")) {
-                            return row[key] !== undefined && row[key] !== null ? String(row[key]).trim() : '';
-                        }
+                    if (!row.hasOwnProperty(key)) continue;
+
+                    const normalizedKey = normalizeKeyString(key);
+                    if (normalizedKey.includes(normalizedModuleNum) && normalizedKey.includes('fecha')) {
+                        const value = row[key];
+                        return value !== undefined && value !== null ? String(value).trim() : '';
                     }
                 }
             }
+
+            // Si no se encontró nada, devolver cadena vacía
             return '';
         }
 
