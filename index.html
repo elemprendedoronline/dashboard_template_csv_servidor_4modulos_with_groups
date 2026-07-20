@@ -1103,36 +1103,58 @@ function renderTable() {
         const safeEmail = escapeHtml(item.email);
         const safeFechaFin = escapeHtml(item.fecha_fin);
 
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 transition border-b border-slate-100/50";
-        tr.innerHTML = `
-            <td class="py-3 px-5 font-mono text-slate-500 font-bold">${safeId}</td>
-            <td class="py-3 px-5 font-bold text-slate-900">${safeNombre}</td>
-            <td class="py-3 px-5 text-slate-500 truncate max-w-xs">${safeEmail}</td>
-            <td class="py-3 px-5 text-center">
-                <div class="flex items-center justify-center gap-2">
-                    <div class="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                        <div class="h-1.5 rounded-full ${item.completado ? 'bg-emerald-500' : 'bg-brand-500'}" style="width: ${pct}%"></div>
-                    </div>
-                    <span class="font-bold text-slate-600">${pct}%</span>
+ pageData.forEach(item => {
+    const totalMod = item.modulos_completados;
+    const pct = Math.round((totalMod / 4) * 100);
+
+    const getModBadge = (status) => {
+        if (String(status).trim().toLowerCase() === 'finalizado') {
+            return `<span class="inline-flex h-5 w-5 rounded-full bg-emerald-100 text-emerald-800 items-center justify-center font-bold text-[10px]" title="Completado">✓</span>`;
+        }
+        return `<span class="inline-flex h-5 w-5 rounded-full bg-slate-100 text-slate-400 items-center justify-center font-bold text-[10px]" title="Pendiente">-</span>`;
+    };
+
+    const safeId = escapeHtml(item.id);
+    const safeNombre = escapeHtml(item.nombre);
+    const safeGrupo = escapeHtml(item.grupo);
+    const safeEmail = escapeHtml(item.email);
+    const safeFechaFin = escapeHtml(item.fecha_fin);
+
+    const tr = document.createElement('tr');
+    tr.className = "hover:bg-slate-50 transition border-b border-slate-100/50";
+    tr.innerHTML = `
+        <td class="py-3 px-5 font-mono text-slate-500 font-bold">${safeId}</td>
+        <td class="py-3 px-5 font-bold text-slate-900">${safeNombre}</td>
+        <td class="py-3 px-5 text-slate-500 truncate max-w-xs">${safeGrupo}</td>
+        <td class="py-3 px-5 text-slate-500 truncate max-w-xs">${safeEmail}</td>
+        <td class="py-3 px-5 text-center">
+            <div class="flex items-center justify-center gap-2">
+                <div class="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                    <div class="h-1.5 rounded-full ${item.completado ? 'bg-emerald-500' : 'bg-brand-500'}" style="width: ${pct}%"></div>
                 </div>
-            </td>
-            <td class="py-3 px-5 text-center">${getModBadge(item.m1)}</td>
-            <td class="py-3 px-5 text-center">${getModBadge(item.m2)}</td>
-            <td class="py-3 px-5 text-center">${getModBadge(item.m3)}</td>
-            <td class="py-3 px-5 text-center">${getModBadge(item.m4)}</td>
-            <td class="py-3 px-5 text-center">
-                ${item.completado 
-                    ? `<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px]" title="${safeFechaFin}">Completado</span>`
-                    : `<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px]">En Curso</span>`
-                }
-            </td>
-            <td class="py-3 px-5 text-right">
-                <button onclick="openParticipantModal('${safeId}')" class="px-2.5 py-1.5 text-[11px] font-bold bg-slate-100 hover:bg-brand-50 hover:text-brand-700 text-slate-600 rounded transition cursor-pointer font-medium">
-                    Ver Ficha
-                </button>
-            </td>
-        `;
+                <span class="font-bold text-slate-600">${pct}%</span>
+            </div>
+        </td>
+        <td class="py-3 px-5 text-center">${getModBadge(item.m1)}</td>
+        <td class="py-3 px-5 text-center">${getModBadge(item.m2)}</td>
+        <td class="py-3 px-5 text-center">${getModBadge(item.m3)}</td>
+        <td class="py-3 px-5 text-center">${getModBadge(item.m4)}</td>
+        <td class="py-3 px-5 text-center">
+            ${item.completado 
+                ? `<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px]" title="${safeFechaFin}">Completado</span>`
+                : `<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px]">En Curso</span>`
+            }
+        </td>
+        <td class="py-3 px-5 text-right">
+            <button onclick="openParticipantModal('${safeId}')" class="px-2.5 py-1.5 text-[11px] font-bold bg-slate-100 hover:bg-brand-50 hover:text-brand-700 text-slate-600 rounded transition cursor-pointer font-medium">
+                Ver Ficha
+            </button>
+        </td>
+    `;
+    tableBody.appendChild(tr);
+});
+
+updatePaginationControls(baseData.length);
         tableBody.appendChild(tr);
     });
 
