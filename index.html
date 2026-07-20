@@ -86,7 +86,7 @@
             <div class="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin"></div>
             <div>
  <p class="font-bold text-slate-900 text-sm">Sincronizando con Taltura</p>
-<p class="text-xs text-slate-500 mt-1">Obteniendo archivo de datos 'dashboard.csv' desde Taltura y renderizando métricas...</p>            </div>
+<p class="text-xs text-slate-500 mt-1">Obteniendo archivo de datos 'dashboard_csv_servidor_4modulos_with_groups.csv' desde Taltura y renderizando métricas...</p>            </div>
         </div>
     </div>
 
@@ -116,7 +116,7 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 tracking-wider uppercase">Organización: INGENIUM</span>
-                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Edición 2025 - 4 módulos</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Edición 2025 - 4 módulos - grupos</span>
                     </div>
                     <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 mt-1">Capacitación: Igualdad Salarial y de Género (40h)</h1>
                 </div>
@@ -137,6 +137,19 @@
 
         <!-- Dashboard Analytics -->
         <div id="dashboard-content" class="space-y-6">
+
+                     <!-- Filtro global por Grupo -->
+    <div class="flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <label for="table-filter-group" class="text-xs font-semibold text-slate-600">
+                Grupo:
+            </label>
+            <select id="table-filter-group" onchange="applyGlobalFilters()" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-600 font-medium focus:ring-2 focus:ring-brand-500 transition outline-none">
+                <option value="todos">Todos los Grupos</option>
+                <!-- Opciones dinámicas se generan desde JS -->
+            </select>
+        </div>
+    </div>
             
             <!-- KPIs Principales -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -317,6 +330,7 @@
                             <tr class="bg-slate-100/50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">
                                 <th class="py-3 px-5">ID</th>
                                 <th class="py-3 px-5">Nombre Completo</th>
+                                <th class="py-3 px-5">Grupo</th>
                                 <th class="py-3 px-5">Dirección de Correo</th>
                                 <th class="py-3 px-5 text-center">Progreso</th>
                                 <th class="py-3 px-5 text-center">M1</th>
@@ -380,6 +394,11 @@
                         <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Dirección de Correo</p>
                         <p class="text-sm font-semibold text-slate-800 break-words" id="modal-participant-email">-</p>
                     </div>
+                     <div>
+    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Grupo</p>
+    <p class="text-sm font-semibold text-slate-800 break-words" id="modal-participant-group">-</p>
+</div>                   
+
                 </div>
 
                 <div class="space-y-3">
@@ -452,8 +471,6 @@
         // Función de utilidad para coincidencia flexible de llaves CSV
         function getRowValueByLooseKey(row, searchKey) {
     if (!row) return '';
-    if (searchKey === null || searchKey === undefined) return '';
-
     const normalizedSearch = normalizeKeyString(searchKey);
 
     for (let key in row) {
@@ -480,34 +497,32 @@
     return '';
 }
 
-function getRowDateValueByLooseKey(row, searchKey) {
-    if (!row) return '';
-    if (searchKey === null || searchKey === undefined) return '';
-
-    const normalizedSearch = normalizeKeyString(searchKey);
-
-    for (let key in row) {
-        if (row.hasOwnProperty(key)) {
-            if (normalizeKeyString(key) === normalizedSearch) {
-                return row[key] !== undefined && row[key] !== null ? String(row[key]).trim() : '';
-            }
-        }
-    }
-
-    const moduleMatch = typeof searchKey === 'string' ? searchKey.match(/Módulo \d/i) : null;
-    if (moduleMatch) {
-        const normalizedModuleNum = normalizeKeyString(moduleMatch[0]);
-        for (let key in row) {
-            if (row.hasOwnProperty(key)) {
-                const normalizedKey = normalizeKeyString(key);
-                if (normalizedKey.includes(normalizedModuleNum) && normalizedKey.includes("fecha")) {
-                    return row[key] !== undefined && row[key] !== null ? String(row[key]).trim() : '';
+        // Función de utilidad flexible para coincidencia de fechas de módulos
+        function getRowDateValueByLooseKey(row, searchKey) {
+            if (!row) return '';
+            const normalizedSearch = normalizeKeyString(searchKey);
+            
+            for (let key in row) {
+                if (row.hasOwnProperty(key)) {
+                    if (normalizeKeyString(key) === normalizedSearch) {
+                        return row[key] !== undefined && row[key] !== null ? String(row[key]).trim() : '';
+                    }
                 }
             }
+            const moduleMatch = searchKey.match(/Módulo \d/i);
+            if (moduleMatch) {
+                const normalizedModuleNum = normalizeKeyString(moduleMatch[0]);
+                for (let key in row) {
+                    if (row.hasOwnProperty(key)) {
+                        const normalizedKey = normalizeKeyString(key);
+                        if (normalizedKey.includes(normalizedModuleNum) && normalizedKey.includes("fecha")) {
+                            return row[key] !== undefined && row[key] !== null ? String(row[key]).trim() : '';
+                        }
+                    }
+                }
+            }
+            return '';
         }
-    }
-    return '';
-}
 
         // Formateador de fecha HTTP (Header Last-Modified)
         function formatHeaderDate(dateObj) {
@@ -537,7 +552,7 @@ function getRowDateValueByLooseKey(row, searchKey) {
 // Sincronización Automática con Taltura (CSV externo)
 async function fetchCSVFromGitHub() {
     // URL del CSV generado por Moodle/Taltura
-    const CSV_URL = 'https://taltura.org/recursos/dashboards_Igualdad_Salarial/dashboard_4modulos.csv';
+    const CSV_URL = 'https://taltura.org/recursos/dashboards_Igualdad_Salarial/dashboard_csv_servidor_4modulos_with_groups';
 
     let response = null;
 
@@ -682,6 +697,13 @@ async function fetchCSVFromGitHub() {
                     }
                 }
 
+                const grupoVal =
+    getRowValueByLooseKey(item, 'nombre de grupo') ||
+    getRowValueByLooseKey(item, 'grupo') ||
+    getRowValueByLooseKey(item, 'group name') ||
+    getRowValueByLooseKey(item, 'grupo_nombre') ||
+    'Sin grupo';
+
                 const idVal = getRowValueByLooseKey(item, 'id') || getRowValueByLooseKey(item, 'numero de id') || Math.random().toString(36).substr(2, 9);
                 const nombreVal = getRowValueByLooseKey(item, 'nombre') || 'Colaborador Sin Nombre';
                 const emailVal = getRowValueByLooseKey(item, 'direccion de correo') || getRowValueByLooseKey(item, 'correo') || getRowValueByLooseKey(item, 'email') || 'sin-correo@ilsa.la';
@@ -689,6 +711,7 @@ async function fetchCSVFromGitHub() {
                 return {
                     id: idVal,
                     nombre: nombreVal,
+                    grupo: grupoVal,
                     email: emailVal,
                     m1: m1_val || 'No finalizado',
                     m1_date: m1_date || '',
@@ -711,12 +734,13 @@ async function fetchCSVFromGitHub() {
             document.getElementById('cutoff-date-badge').innerText = cutoffDateValue;
             document.getElementById('dashboard-content').classList.remove('hidden');
 
-            renderKPIs();
-            renderCharts();
-            renderModuleBreakdown();
-            renderDomainBreakdown();
-            renderTable();
-        }
+            // Poblar el filtro de grupo con los datos ya cargados
+populateGroupFilter();
+
+// Aplicar filtros globales (búsqueda + grupo) y desde ahí recalcular KPIs, gráficos y tabla
+applyGlobalFilters();
+}  // cierra processUploadedData
+        
 
         // Renderizadores de Datos
         function renderKPIs() {
@@ -961,29 +985,61 @@ async function fetchCSVFromGitHub() {
             }
         }
 
-        function renderTable() {
-            const tableBody = document.getElementById('colaboradores-table-body');
-            tableBody.innerHTML = '';
+function populateGroupFilter() {
+    const select = document.getElementById('table-filter-group');
+    if (!select) return;
 
-            const startIndex = (currentPage - 1) * rowsPerPage;
-            const endIndex = startIndex + rowsPerPage;
-            const pageData = window.filteredDataset.slice(startIndex, endIndex);
+    // Limpiar opciones actuales excepto "Todos los Grupos"
+    select.innerHTML = '<option value="todos">Todos los Grupos</option>';
 
-            if (pageData.length === 0) {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="11" class="py-12 text-center text-slate-400">
-                            <div class="space-y-2">
-                                <span class="text-3xl">🔍</span>
-                                <p class="text-sm font-semibold">No se encontraron resultados</p>
-                                <p class="text-xs">Prueba ajustando el buscador o la categoría seleccionada.</p>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                updatePaginationControls(0);
-                return;
-            }
+    // Obtener valores únicos de grupo
+    const gruposSet = new Set();
+    window.cleanDataset.forEach(item => {
+        if (item.grupo && String(item.grupo).trim() !== '') {
+            gruposSet.add(String(item.grupo).trim());
+        }
+    });
+
+    const gruposOrdenados = Array.from(gruposSet).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+    gruposOrdenados.forEach(grupo => {
+        const option = document.createElement('option');
+        option.value = grupo;
+        option.textContent = grupo;
+        select.appendChild(option);
+    });
+}
+
+
+function renderTable() {
+    const tableBody = document.getElementById('colaboradores-table-body');
+    if (!tableBody) return;
+
+    tableBody.innerHTML = '';
+
+    // Dataset base para la tabla: filtrado por estado (si existe) o filtrado global.
+    const baseData = window.tableStatusFilteredDataset || window.filteredDataset || [];
+    
+    const totalRows = baseData.length;
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const pageData = baseData.slice(startIndex, endIndex);
+
+    if (pageData.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="12" class="py-12 text-center text-slate-400">
+                    <div class="space-y-2">
+                        <span class="text-3xl">🔍</span>
+                        <p class="text-sm font-semibold">No se encontraron resultados</p>
+                        <p class="text-xs">Prueba ajustando el buscador, el grupo o el estado.</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        updatePaginationControls(0);
+        return;
+    }
 
             pageData.forEach(item => {
                 const totalMod = item.modulos_completados;
@@ -1054,35 +1110,74 @@ async function fetchCSVFromGitHub() {
             }
         }
 
-        // Navegación hacia adelante
-        function nextPage() {
-            const totalPages = Math.ceil(window.filteredDataset.length / rowsPerPage);
-            if (currentPage < totalPages) {
-                currentPage++;
-                renderTable();
-            }
+         // Navegación hacia adelante
+ function nextPage() {
+    const baseData = window.tableStatusFilteredDataset || window.filteredDataset || [];
+    const totalPages = Math.max(1, Math.ceil(baseData.length / rowsPerPage));
+    if (currentPage < totalPages) {
+        currentPage++;
+        renderTable();
+    }
+}
+function applyGlobalFilters() {
+    const searchQueryEl = document.getElementById('table-search-input');
+    const groupFilterEl = document.getElementById('table-filter-group');
+
+    const searchQuery = searchQueryEl ? searchQueryEl.value.toLowerCase().trim() : '';
+    const groupFilter = groupFilterEl ? groupFilterEl.value : 'todos';
+
+    window.filteredDataset = window.cleanDataset.filter(item => {
+        // Filtro por búsqueda (nombre, email, id)
+        const matchesSearch =
+            String(item.nombre || '').toLowerCase().includes(searchQuery) ||
+            String(item.email || '').toLowerCase().includes(searchQuery) ||
+            String(item.id || '').toString().includes(searchQuery);
+
+        // Filtro por grupo (global)
+        let matchesGroup = true;
+        if (groupFilter && groupFilter !== 'todos') {
+            const itemGrupo = String(item.grupo || '').trim().toLowerCase();
+            const filtroGrupo = String(groupFilter).trim().toLowerCase();
+            matchesGroup = itemGrupo === filtroGrupo;
         }
 
-        function filterTable() {
-            const searchQuery = document.getElementById('table-search-input').value.toLowerCase().trim();
-            const statusFilter = document.getElementById('table-filter-status').value;
+        return matchesSearch && matchesGroup;
+    });
 
-            window.filteredDataset = window.cleanDataset.filter(item => {
-                const matchesSearch = item.nombre.toLowerCase().includes(searchQuery) || item.email.toLowerCase().includes(searchQuery) || item.id.toString().includes(searchQuery);
-                
-                let matchesStatus = true;
-                if (statusFilter === 'finalizado') {
-                    matchesStatus = item.completado;
-                } else if (statusFilter === 'no-finalizado') {
-                    matchesStatus = !item.completado;
-                }
+    // Reiniciar página
+    currentPage = 1;
 
-                return matchesSearch && matchesStatus;
-            });
+    // Re-renderizar TODO el dashboard (base = filteredDataset)
+    renderKPIs();
+    renderCharts();
+    renderModuleBreakdown();
+    renderDomainBreakdown();
 
-            currentPage = 1;
-            renderTable();
-        }
+    // Aplicar inmediatamente el filtro de estado sobre lo nuevo
+    filterTable();
+}
+
+function filterTable() {
+    const statusFilterEl = document.getElementById('table-filter-status');
+    const statusFilter = statusFilterEl ? statusFilterEl.value : 'todos';
+
+    // El filtro de estado se aplica SOLO sobre window.filteredDataset
+    // que ya viene filtrado por grupo y búsqueda.
+    let tableBaseData = window.filteredDataset;
+
+    if (statusFilter === 'finalizado') {
+        tableBaseData = tableBaseData.filter(item => item.completado);
+    } else if (statusFilter === 'no-finalizado') {
+        tableBaseData = tableBaseData.filter(item => !item.completado);
+    }
+
+    // Guardamos el subconjunto solo para la tabla
+    // (opcional: puedes usar una variable local dentro de renderTable)
+    window.tableStatusFilteredDataset = tableBaseData;
+
+    currentPage = 1;
+    renderTable();
+}
 
         function openParticipantModal(id) {
             const user = window.cleanDataset.find(item => item.id.toString() === id.toString());
@@ -1092,10 +1187,13 @@ async function fetchCSVFromGitHub() {
 
             document.getElementById('modal-participant-name').innerText = user.nombre;
             document.getElementById('modal-participant-id').innerText = user.id;
+            document.getElementById('modal-participant-group').innerText = user.grupo || 'Sin grupo';
             document.getElementById('modal-participant-email').innerText = user.email;
 
             const checklistContainer = document.getElementById('modal-modules-checklist');
             checklistContainer.innerHTML = '';
+
+
 
             const modules = [
                 { name: MODULE_NAMES[0], status: user.m1, date: user.m1_date },
